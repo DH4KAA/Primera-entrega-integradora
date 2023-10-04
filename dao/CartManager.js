@@ -1,82 +1,94 @@
-import { productModel } from "./models/product.model.js";
+import { cartModel } from "./models/cart.model.js";
 
-class ProductManager {
-    async addProduct(product) {
+class CartManager {
+    async newCart() {
+        console.log("Cart created!");
+        return await cartModel.create({products:[]});
+    }
+
+    async getCart(id) {
         try {
-            if (await this.validateCode(product.code)) {
-                console.log("Error! Code exists!");
-    
-                return false;
-            } else {
-                await productModel.create(product)
-                console.log("Product added!");
-    
-                return true;
-            }
-        } catch (error) {
-            return false;
-        }
-    }
-
-    async updateProduct(id, product) {
-        try {
-            if (this.validateId(id)) {   
-                if (await this.getProductById(id)) {
-                    await productModel.updateOne({_id:id}, product);
-                    console.log("Product updated!");
-        
-                    return true;
-                }
-            }
-            
-            return false;
-        } catch (error) {
+            return await cartModel.findOne({_id:id}) || null;
+        } catch(error) {
             console.log("Not found!");
-    
-            return false;
-        }
-    }
 
-    async deleteProduct(id) {
-        try {
-            if (this.validateId(id)) {    
-                if (await this.getProductById(id)) {
-                    await productModel.deleteOne({_id:id});
-                    console.log("Product deleted!");
-    
-                    return true;
-                }
-            }
-
-            return false;
-        } catch (error) {
-            console.log("Not found!");
-    
-            return false;
-        }
-    }
-
-    async getProducts(limit) {
-        return await limit ? productModel.find().limit(limit).lean() : productModel.find().lean();
-    }
-
-    async getProductById(id) {
-        if (this.validateId(id)) {
-            return await productModel.findOne({_id:id}).lean() || null;
-        } else {
-            console.log("Not found!");
-            
             return null;
         }
     }
 
-    validateId(id) {
-        return id.length === 24 ? true : false;
+    async getCarts() {
+        return await cartModel.find().lean();
     }
 
-    async validateCode(code) {
-        return await productModel.findOne({code:code}) || false;
+    async addProduct(cid, pid) {
+        try {
+            if (await cartModel.exists({_id:cid, products:{$elemMatch:{product:pid}}})) {
+                await cartModel.updateOne({_id:cid, products:{$elemMatch:{product:pid}}}, {$inc:{"products.$.quantity":1}}, {new:true, upsert:true});
+            } else {
+                await cartModel.updateOne({_id:cid}, {$push:{products:{"product":pid, "quantity":1}}}, {new:true, upsert:true});
+            }
+
+            console.log("Product added!");
+    
+            return true;
+        } catch (error) {
+            console.log("Not found!");
+                
+            return false;
+        }
+    }
+
+    async updateProducts(cid, products) {
+        try {
+            await cartModel.updateOne({_id:cid}, {products:products}, {new:true, upsert:true});
+            console.log("Product updated!");
+    
+            return true;
+        } catch (error) {
+            console.log("Not found!");
+            
+            return false;
+        }
+    }
+
+    async updateQuantity(cid, pid, quantity) {
+        try {
+            await cartModel.updateOne({_id:cid, products:{$elemMatch:{product:pid}}}, {$set:{"products.$.quantity":quantity}});
+            console.log("Product updated!");
+    
+            return true;
+        } catch (error) {
+            console.log("Not found!");
+            
+            return false;
+        }
+    }
+
+    async deleteProduct(cid, pid) {
+        try {
+            await cartModel.updateOne({_id:cid}, {$pull:{products:{product:pid}}});
+            console.log("Product deleted!");
+    
+            return true;
+        } catch (error) {
+            console.log("Not found!");
+            
+            return false;
+        }
+    }
+
+    async deleteProducts(cid) {
+        try {
+            await cartModel.updateOne({_id:cid}, {products:[]});
+            console.log("Products deleted!");
+    
+            return true;
+        } catch (error) {
+            console.log("Not found!");
+            
+            return false;
+        }
     }
 }
 
-export default ProductManager;
+export default CartManager;
